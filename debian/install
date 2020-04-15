@@ -1,0 +1,3 @@
+plugins/* /usr/share/perl5/Lemonldap/NG/Portal/Plugins/
+static/* /usr/share/lemonldap-ng/portal/htdocs/static/
+templates/* /usr/share/lemonldap-ng/portal/templates/bootstrap/

@@ -1,0 +1,5 @@
+debian-sso (0.0.1) UNRELEASED; urgency=medium
+
+  * Initial release
+
+ -- Xavier Guimard <yadd@debian.org>  Tue, 24 Mar 2020 13:18:30 +0100

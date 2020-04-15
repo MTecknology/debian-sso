@@ -1,0 +1,19 @@
+Source: debian-sso
+Maintainer: Xavier Guimard <yadd@debian.org>
+Section: devel
+Priority: optional
+Build-Depends:
+ debhelper-compat (= 12),
+Standards-Version: 4.5.0
+Vcs-Browser: https://salsa.debian.org/debian-sso
+Vcs-Git: https://salsa.debian.org/debian-sso.git
+Homepage: https://salsa.debian.org/debian-sso
+Rules-Requires-Root: no
+
+Package: debian-sso
+Architecture: all
+Depends:
+ ${misc:Depends},
+ lemonldap-ng
+Description: Debian SSO template
+ TODO

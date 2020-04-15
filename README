@@ -1,0 +1,12 @@
+To enable it:
+ * add `customPlugins = Lemonldap::NG::Portal::Plugins::DebianSSOCerts` in
+   /etc/lemonldap-ng.ini, section [portal]
+ * add a menu entry that points to `https://<portal>/certs`
+
+Configuration:
+ * to avoid mail filtering, change default "From" parameter in LLNG SMTP
+   configuration
+
+TODO:
+ * improve CSS
+ * improve all openssl commands (plugins directory)
