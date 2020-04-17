@@ -3,8 +3,9 @@ package Lemonldap::NG::Portal::Plugins::DebianSSOCerts;
 use strict;
 
 use Moo;
-use Dpkg::IPC;
+use IPC::Run;
 use Date::Parse;
+use File::Temp;
 
 extends 'Lemonldap::NG::Portal::Main::Plugin',
   'Lemonldap::NG::Portal::Lib::SMTP';
@@ -81,6 +82,13 @@ has ottSecure => (
     }
 );
 
+has tmpDir => (
+    is      => 'ro',
+    default => sub {
+        return File::Temp::tempdir( CLEANUP => 1 );
+    },
+);
+
 sub init {
     my ($self) = @_;
     $self->addAuthRouteWithRedirect(
@@ -122,31 +130,44 @@ sub enrollSecure {
         my $url =
           $self->conf->{portal} . "certs/enrollSecure?secureToken=$token";
         my $txt = "Go to $url to get a higher authentication level";
-        spawn(
-            exec => [
-                qw(gpg --homedir /dev/null --list-keys),
-                ( split /,?\s+/, $self->gpgDatabases ),
+        my ( $out, $err );
+        IPC::Run::run( [
+                qw(gpg --list-keys --homedir),
+                $self->tmpDir,
+                (
+                    map { ( '--keyring', $_ ) } split /,?\s+/,
+                    $self->gpgDatabases
+                ),
                 $mail
             ],
-            wait_child => 1,
-            nocheck    => 1,
+            ,
+            \$out,
+            \$err,
         );
-        if ($@) {
+
+        if ($?) {
+            $self->userLogger->notice(
+                "gpg failed to find user in database: $err");
             return $self->p->sendError( $req,
 q{you requested this, but you can't use it unless your official key made it all the way into the package and found a release}
             );
         }
-        my $out;
-        spawn(
-            exec => [
-                qw(gpg --encrypt --armor --yes --keyring /usr/share/keyrings/debian-keyring.gpg --trust-model always -r),
-                $mail
+        IPC::Run::run( [
+                qw(gpg --encrypt --armor --yes --trust-model always -r),
+                $mail,
+                (
+                    map { ( '--keyring', $_ ) } split /,?\s+/,
+                    $self->gpgDatabases
+                ),
             ],
-            from_string => \$txt,
-            to_string   => \$out,
-            wait_child  => 1,
-            nocheck     => 1,
+            \$txt,
+            \$out,
+            \$err,
         );
+        if ($?) {
+            $self->logger->error("gpg error: $err");
+            return $self->p->sendError( $req, 'gpg failed' );
+        }
         $self->send_mail( $mail, 'High verification mail', $out );
         return $self->p->sendHtml(
             $req, 'error',
@@ -216,17 +237,13 @@ sub signCSR {
     my $csr  = $req->param('csr');
     my $days = $req->param('validity') || 365;
     $days = 365 if $days > 365 or $days < 1;
-    my $out;
+    my ( $out, $err );
 
     # Check CSR
-    spawn(
-        exec        => [ $self->openssl, qw'req -noout -text' ],
-        from_string => \$csr,
-        to_string   => \$out,
-        wait_child  => 1,
-        nocheck     => 1,
-    );
-    if ($@) {
+    IPC::Run::run( [ $self->openssl, qw'req -noout -text' ],
+        \$csr, \$out, \$err, );
+    if ($?) {
+        $self->userLogger->error("Bad CSR request: $err");
         $self->p->sendError( $req, 'Bad request' );
     }
 
@@ -247,28 +264,20 @@ sub signCSR {
     # Sign cert
     my $cmd =
       ( $highLevel ? $self->opensslHighSignArgs : $self->opensslSignArgs );
-    spawn(
-        exec        => [ $self->openssl, ( split /\s+/, $cmd ), $days ],
-        from_string => \$csr,
-        to_string   => \$out,
-        wait_child  => 1,
-        nocheck     => 1,
-    );
-    if ($@) {
+    IPC::Run::run( [ $self->openssl, ( split /\s+/, $cmd ), $days ],
+        \$csr, \$out, \$err, );
+    if ($?) {
+        $self->userLogger->error("Bad CSR request: $err");
         $self->p->sendError( $req, 'Bad request' );
     }
     my $crt = $out;
 
     # Retrive serial number
-    spawn(
-        exec        => [ $self->openssl, qw'x509 -noout -text' ],
-        from_string => \$crt,
-        to_string   => \$out,
-        wait_child  => 1,
-        nocheck     => 1,
-    );
-    if ($@) {
-        $self->p->sendError( $req, 'Bad request' );
+    IPC::Run::run( [ $self->openssl, qw'x509 -noout -text' ],
+        \$crt, \$out, \$err, );
+    if ($?) {
+        $self->logger->error("Unable to read generated certificate: $err");
+        $self->p->sendError( $req, 'openssl error', 500 );
     }
     unless ( $out =~ /Serial Number:\s+([0-9a-f:]+)\n/s ) {
         $self->logger->error("Unable to find serial number in: $out");
