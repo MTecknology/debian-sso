@@ -15,6 +15,7 @@ Architecture: all
 Depends:
  ${misc:Depends},
  debian-keyring,
- lemonldap-ng
+ lemonldap-ng,
+ libipc-run-perl
 Description: Debian SSO template
  TODO
