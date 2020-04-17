@@ -16,6 +16,9 @@
               <tr><td><TMPL_VAR NAME="expires"></td></tr>
               </TMPL_IF>
               <tr><td><TMPL_VAR NAME="comment"></td></tr>
+	      <TMPL_IF NAME="highLevel">
+	      <tr><td>High level</td></tr>
+	      </TMPL_IF>
             </tbody>
           </table>
           <input type="submit" class="btn btn-primary" value="Revoke this certificate" />

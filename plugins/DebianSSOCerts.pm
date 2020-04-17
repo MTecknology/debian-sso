@@ -11,30 +11,30 @@ extends 'Lemonldap::NG::Portal::Main::Plugin',
 
 # lemonldap-ng.ini parameters (section [portal]
 has openssl => (
-    is => 'ro',
+    is      => 'ro',
     default => sub {
-        $_[0]->conf->{openssl} || '/var/lib/debian-sso/openssl.sh'
+        $_[0]->conf->{openssl} || '/var/lib/debian-sso/openssl.sh';
     },
 );
 
 has gpgCertTokenTimeout => (
-    is => 'ro',
+    is      => 'ro',
     default => sub {
-        $_[0]->conf->{gpgCertTokenTimeout} || 600
+        $_[0]->conf->{gpgCertTokenTimeout} || 600;
     },
 );
 
 has highCertAuthnLevel => (
-    is => 'ro',
+    is      => 'ro',
     default => sub {
-        $_[0]->conf->{highCertAuthnLevel} || 5
+        $_[0]->conf->{highCertAuthnLevel} || 5;
     },
 );
 
 has mailAttribute => (
-    is => 'ro',
+    is      => 'ro',
     default => sub {
-        $_[0]->conf->{mailAttribute} || 'mail'
+        $_[0]->conf->{mailAttribute} || 'mail';
     },
 );
 
@@ -52,7 +52,7 @@ has ottSecure => (
     lazy    => 1,
     default => sub {
         my $ott = $_[0]->{p}->loadModule('::Lib::OneTimeToken');
-        $ott->timeout($_[0]->gpgCertTokenTimeout);
+        $ott->timeout( $_[0]->gpgCertTokenTimeout );
         return $ott;
     }
 );
@@ -91,14 +91,9 @@ sub enrollSecure {
         }
     }
     if ( $req->userData->{authenticationLevel} < $self->highCertAuthnLevel ) {
-        my $mail = $req->userData->{$self->mailAttribute}
+        my $mail = $req->userData->{ $self->mailAttribute }
           or return $self->p->sendError( $req, 'Unable to retrieve mail', 500 );
 
-        # DEBUG
-        $self->conf->{mailFrom} = 'yadd@debian.org';
-        $mail = 'yadd@debian.org';
-
-        # /DEBUG
         my $token = $self->ottSecure->createToken( { secureCert => 1 } );
         my $url =
           $self->conf->{portal} . "certs/enrollSecure?secureToken=$token";
@@ -132,7 +127,7 @@ sub enrollSecure {
             params => {
                 RAW_ERROR       => 1,
                 AUTH_ERROR_TYPE => 'warning',
-                RAW_ERROR       => 'GPG encrypted message sent, click on the link'
+                RAW_ERROR => 'GPG encrypted message sent, click on the link'
             }
         );
     }
@@ -168,7 +163,10 @@ sub enroll {
         $req,
         'certenroll',
         params => {
-            LEVEL => ($req->userData->{authenticationLevel} == $self->highCertAuthnLevel),
+            LEVEL => (
+                $req->userData->{authenticationLevel} ==
+                  $self->highCertAuthnLevel
+            ),
             TOKEN => $self->ott->createToken(
                 { id => $req->userData->{_session_id} }
 
@@ -181,7 +179,8 @@ sub enroll {
 # Sing CSR
 sub signCSR {
     my ( $self, $req ) = @_;
-    my $highLevel = ($req->userData->{authenticationLevel} == $self->highCertAuthnLevel);
+    my $highLevel =
+      ( $req->userData->{authenticationLevel} == $self->highCertAuthnLevel );
     my $id = $self->ott->getToken( $req->param('token') );
     unless ( $id and $id->{id} eq $req->userData->{_session_id} ) {
         $self->userLogger->notice('Bad token');
@@ -252,6 +251,7 @@ sub signCSR {
         serial  => $serial,
         expires => $expires,
         comment => $req->param('comment') || '',
+        ( $highLevel ? ( highLevel => 1 ) : () ),
       };
     $self->p->updatePersistentSession( $req, { debianCerts => $currentCert } );
 
@@ -272,9 +272,9 @@ sub getCurrentCerts {
     my $currentCert =
       $self->p->getPersistentSession($user)->data->{debianCerts} || [];
     my $now = time;
-    foreach(@$currentCert) {
-        print STDERR '# '.str2time($_->{expires})." $now\n";
-        $_->{expired} = 1 if str2time($_->{expires}) < $now;
+    foreach (@$currentCert) {
+        print STDERR '# ' . str2time( $_->{expires} ) . " $now\n";
+        $_->{expired} = 1 if str2time( $_->{expires} ) < $now;
     }
     return $currentCert;
 }

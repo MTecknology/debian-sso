@@ -27,7 +27,7 @@ openssl "$@"
    * **gpgCertTokenTimeout**: timeout for GPG verification. Default: 600
    * **highCertAuthnLevel**, default: 5. Two usages:
      * authenticationLevel given after GPG verification
-     * authenticationLevel required to get a high level
+     * authenticationLevel required to get a high level certificate
    * mailAttribute: user attribute that contains user's mail. Default: `mail`
 
 TODO:
