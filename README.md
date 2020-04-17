@@ -27,6 +27,10 @@ openssl "$@"
    * **gpgCertTokenTimeout**: timeout for GPG verification. Default: 600
    * **gpgDatabases**: GPG databases for high level certificates. Default:
      `/usr/share/keyrings/debian-nonupload.gpg /usr/share/keyrings/debian-keyring.gpg`
+   * **opensslSignArgs**: openssl arguments to sign certs. Default:
+     `x509 -req -CA ca.crt -CAkey ca.key -CAcreateserial -days`
+   * **opensslHighSignArgs**: openssl arguments to high level certs. Default: same
+     value than **opensslSignArgs**
    * **highCertAuthnLevel**, default: 5. Two usages:
      * authenticationLevel given after GPG verification
      * authenticationLevel required to get a high level certificate

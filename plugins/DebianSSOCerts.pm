@@ -46,6 +46,22 @@ has mailAttribute => (
     },
 );
 
+has opensslSignArgs => (
+    is      => 'ro',
+    default => sub {
+        $_[0]->conf->{opensslSignArgs}
+          || 'x509 -req -CA ca.crt -CAkey ca.key -CAcreateserial -days';
+    },
+);
+
+has opensslHighSignArgs => (
+    is      => 'ro',
+    lazy    => 1,
+    default => sub {
+        $_[0]->opensslSignArgs;
+    },
+);
+
 has ott => (
     is      => 'rw',
     lazy    => 1,
@@ -229,11 +245,10 @@ sub signCSR {
     }
 
     # Sign cert
+    my $cmd =
+      ( $highLevel ? $self->opensslHighSignArgs : $self->opensslSignArgs );
     spawn(
-        exec => [
-            $self->openssl,
-            qw'x509 -req -CA ca.crt -CAkey ca.key -CAcreateserial -days', $days
-        ],
+        exec        => [ $self->openssl, ( split /\s+/, $cmd ), $days ],
         from_string => \$csr,
         to_string   => \$out,
         wait_child  => 1,
