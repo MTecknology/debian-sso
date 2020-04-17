@@ -108,7 +108,8 @@ sub enrollSecure {
         );
         if ($@) {
             return $self->p->sendError( $req,
-                'Mail not found in DD GPG database' );
+q{you requested this, but you can't use it unless your official key made it all the way into the package and found a release}
+            );
         }
         my $out;
         spawn(
