@@ -10,6 +10,7 @@
           <input type="number" name="validity" value="365" required id="id_validity" /><br/>
           <small>Validity of the certificate in days (max 365)</small>
           <input id="token" type="hidden" name="token" value="<TMPL_VAR NAME="TOKEN">" />
+          <input id="mail" type="hidden" value="<TMPL_VAR NAME="MAIL">" />
         </p>
       </div>
       <div class="row">

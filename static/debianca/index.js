@@ -52,7 +52,7 @@ $(document).ready(function() {
 
     pkcs10CSR.version = 0;
     pkcs10CSR.attributes = [];
-    populateAttr(pkcs10CSR,'CN','yadd@debian.org');
+    populateAttr(pkcs10CSR,'CN',$('#mail').val());
     populateAttr(pkcs10CSR,'O','Debian');
     populateAttr(pkcs10CSR,'OU','Debian Developers');
 
@@ -115,7 +115,7 @@ $(document).ready(function() {
           },
           error: function(err) {
             console.error('Error: ', err);
-            $('#catitle').html('An error happens, may be an expired token, try to reload this page');
+            $('#catitle').html('An error occured, this may be an expired token, try to reload this page');
             $('#catitle').removeClass('alert-success').addClass('alert-danger');
           },
         });

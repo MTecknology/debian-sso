@@ -172,6 +172,7 @@ sub enroll {
 
                 #{ user => $req->userData }
             ),
+            MAIL => $req->userData->{ $self->mailAttribute },
         }
     );
 }
@@ -209,6 +210,12 @@ sub signCSR {
     {
         $self->userLogger->error("Bad CSR : $out");
         return $self->p->sendError( $req, 'Bad CSR request: ' . $out );
+    }
+    my $cn       = $1;
+    my $userMail = $req->userData->{ $self->mailAttribute };
+    if ( $cn !~ /\Q$userMail\E/ ) {
+        return $self->p->sendError( $req,
+            "Mail mistamtch in CN, this should be $userMail", 400 );
     }
 
     # Sign cert
