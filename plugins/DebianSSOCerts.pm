@@ -17,6 +17,14 @@ has openssl => (
     },
 );
 
+has gpgDatabases => (
+    is      => 'ro',
+    default => sub {
+        $_[0]->conf->{gpgDatabases}
+          || '/usr/share/keyrings/debian-nonupload.gpg /usr/share/keyrings/debian-keyring.gpg';
+    },
+);
+
 has gpgCertTokenTimeout => (
     is      => 'ro',
     default => sub {
@@ -100,7 +108,8 @@ sub enrollSecure {
         my $txt = "Go to $url to get a higher authentication level";
         spawn(
             exec => [
-                qw(gpg --homedir /dev/null --keyring /usr/share/keyrings/debian-keyring.gpg --list-keys),
+                qw(gpg --homedir /dev/null --list-keys),
+                ( split /,?\s+/, $self->gpgDatabases ),
                 $mail
             ],
             wait_child => 1,

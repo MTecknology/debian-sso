@@ -25,10 +25,12 @@ openssl "$@"
    List:
    * **openssl**: path to `openssl.sh`. Default: `/var/lib/debian-sso/openssl.sh`
    * **gpgCertTokenTimeout**: timeout for GPG verification. Default: 600
+   * **gpgDatabases**: GPG databases for high level certificates. Default:
+     `/usr/share/keyrings/debian-nonupload.gpg /usr/share/keyrings/debian-keyring.gpg`
    * **highCertAuthnLevel**, default: 5. Two usages:
      * authenticationLevel given after GPG verification
      * authenticationLevel required to get a high level certificate
-   * mailAttribute: user attribute that contains user's mail. Default: `mail`
+   * **mailAttribute**: user attribute that contains user's mail. Default: `mail`
 
 TODO:
  * improve CSS
