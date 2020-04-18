@@ -4,7 +4,9 @@ use strict;
 
 use Moo;
 
-extends 'Lemonldap::NG::Portal::Main::Plugin';
+extends 'Lemonldap::NG::Portal::Main::Plugin',
+  'Lemonldap::NG::Portal::Lib::DBI',
+  'Lemonldap::NG::Portal::Lib::LDAP';
 
 use Lemonldap::NG::Portal::Main::Constants qw(
   PE_OK
@@ -79,7 +81,11 @@ sub check {
 # This method receives POST requests from registration form
 sub register {
     my ( $self, $req ) = @_;
-    # TODO:
+
+    # Objects inherited from LLNG libs (configured via manager:
+    # "General Parameters" => "authentication modules":
+    #  * $self->dbh : SQL  connection (non DD users, registered using this plugin)
+    #  * $self->ldap: LDAP connection (DD users)
 }
 
 1;
