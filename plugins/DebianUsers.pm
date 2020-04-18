@@ -83,7 +83,7 @@ sub register {
     my ( $self, $req ) = @_;
 
     # Objects inherited from LLNG libs (configured via manager:
-    # "General Parameters" => "authentication modules":
+    # "General Parameters" => "authentication modules"):
     #  * $self->dbh : SQL  connection (non DD users, registered using this plugin)
     #  * $self->ldap: LDAP connection (DD users)
 }
