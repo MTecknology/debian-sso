@@ -27,14 +27,15 @@
       </TMPL_LOOP>
     </div>
   </div>
-  <div class="buttons">
-    <a href="/certs/enroll" class="btn btn-primary" role="button">
-      <span class="fa fa-key"></span>
-      <span>Add a certificate</span>
-    </a>
-    <a id="goback" href="/" class="btn btn-primary" role="button">
-      <span class="fa fa-home"></span>
-      <span trspan="goToPortal">Go to portal</span>
-    </a>
-  </div>
 </main>
+<div class="buttons">
+  <a href="/certs/enroll" class="btn btn-primary" role="button">
+    <span class="fa fa-key"></span>
+    <span>Add a certificate</span>
+  </a>
+  <a id="goback" href="/" class="btn btn-primary" role="button">
+    <span class="fa fa-home"></span>
+    <span trspan="goToPortal">Go to portal</span>
+  </a>
+</div>
+<TMPL_INCLUDE NAME="footer.tpl">
