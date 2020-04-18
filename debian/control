@@ -14,8 +14,16 @@ Package: debian-sso
 Architecture: all
 Depends:
  ${misc:Depends},
+ ca-certificates,
  debian-keyring,
  lemonldap-ng,
- libipc-run-perl
+ libcrypt-u2f-server-perl,
+ libio-socket-ssl-perl,
+ libipc-run-perl,
+# For SAML support:
+# libglib-perl,
+# liblasso-perl,
+ liblwp-protocol-https-perl,
+ libnet-ldap-perl
 Description: Debian SSO template
  TODO
