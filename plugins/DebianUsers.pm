@@ -35,7 +35,7 @@ our @fields = (qw(uid displayname sshkey gpgkey));
 
 # Sessions parameter: this plugin uses macros that returns wanted data:
 #  * mail: should be
-#    `($uid ? "$uid\@debian.org" : $linkedIn_emailAddress ? $linkedIn_emailAddress : $github_emailAddress )`
+#    `($linkedIn_emailAddress ? $linkedIn_emailAddress : $github_emailAddress ? $github_emailAddress : "$uid\@debian.org" )`
 
 # LLNG Entry point to catch authentication requests before "search" step
 use constant aroundSub => { getUser => 'check' };
@@ -125,7 +125,7 @@ sub register {
                   $req,
                   {
                       result => 0,
-                      error  => 'Nickname exists already, choose another one'
+                      error  => 'Nickname already exists, choose another one'
                   }
               );
           }
