@@ -38,7 +38,8 @@ has debianRegisterTimeout => (
 # * lastname
 # * gpgkey: GPG key
 # * sshkey: SSK key
-our @fields = (qw(uid mail displayname sshkey gpgkey));
+our @fields =
+  (qw(uid mail username displayname firstname lastname gpgkey sshkey));
 
 # Sessions parameter: this plugin uses macros that returns wanted data:
 #  * mail: should be
@@ -129,7 +130,7 @@ sub register {
 
     # Check other fields
     my $error = $self->_checkOtherFields($req);
-    if($error) {
+    if ($error) {
         return $self->form( $req, $error );
     }
 
@@ -223,7 +224,8 @@ sub _checknickname {
 }
 
 sub _checkOtherFields {
-    my($self,$req) = @_;
+    my ( $self, $req ) = @_;
+
     # TODO: insert here fields checks
     return '';
 }
@@ -235,11 +237,12 @@ sub _registerUser {
     my ( $self, $req ) = @_;
     my $sth;
     eval {
-        $sth = $self->dbh->prepare( 'INSERT INTO '
-              . $self->table . '('
-              . join( ',', @fields ) . ')'
-              . ' VALUES ('
-              . join( ',', map { '?' } @fields )
+        $sth =
+          $self->dbh->prepare( 'INSERT INTO '
+              . $self->table . ' ('
+              . join( ',', @fields )
+              . ') VALUES ('
+              . join( ',', '?' x @fields )
               . ')' );
         $sth->execute( map { $req->param($_) } @fields );
     };
