@@ -14,6 +14,7 @@ extends 'Lemonldap::NG::Portal::Main::Plugin',
 use Lemonldap::NG::Portal::Main::Constants qw(
   PE_OK
   PE_INFO
+  PE_SENDRESPONSE
 );
 
 # Parameters
@@ -27,11 +28,17 @@ has debianRegisterTimeout => (
 );
 
 # SQL fields
-# * uid: nickname
-# * displayname: display name
-# * sshkey: SSK key
+# Required:
+# * uid: LinkedIn uid
+# * mail: mail given by LinkedIn (may be changed later)
+# * username: chosen Debian uid
+# * displayname: fullname to display
+# * firstname
+# Optional:
+# * lastname
 # * gpgkey: GPG key
-our @fields = (qw(uid displayname sshkey gpgkey));
+# * sshkey: SSK key
+our @fields = (qw(uid mail displayname sshkey gpgkey));
 
 # Sessions parameter: this plugin uses macros that returns wanted data:
 #  * mail: should be
@@ -60,6 +67,9 @@ sub init {
     return 1;
 }
 
+# This method is launched during auth process, it must returns LLNG constants
+#
+# Response Lemonldap::NG::Portal::Main::Constants constant
 sub check {
     my ( $self, $sub, $req ) = @_;
 
@@ -80,11 +90,16 @@ sub check {
     # Calculate macros
     $self->p->setMacros($req);
 
-    # Display registration form
-    return $self->form($req);
+   # Display registration form: since we are in auth process, direct PSGI output
+   # is not allowed here, we must use this hook
+    $req->response( $self->form($req) );
+    return PE_SENDRESPONSE;
 }
 
-# This method receives POST requests from registration form
+# This method receives POST requests from registration form (POST requests only
+# as declared in init() method)
+#
+# Response in PSGI format
 sub register {
     my ( $self, $req ) = @_;
 
@@ -107,108 +122,163 @@ sub register {
     $req->user( $session->{user} );
     $req->sessionInfo( $session->{data} );
 
+    # Check username string
+    if ( $nickname !~ $self->nickRegexp ) {
+        return $self->form( $req, 'Nickname not allowed' );
+    }
+
+    # Check other fields
+    my $error = $self->_checkOtherFields($req);
+    if($error) {
+        return $self->form( $req, $error );
+    }
+
     # 2 - verify that nickname does not already exist in LDAP or SQL DB
     my $res = eval { $self->_checknickname($nickname) };
     if ($@) {
-          return $self->p->sendError( $req, 'LDAP server seems down', 500 );
+        return $self->p->sendError( $req, 'Registration databases seems down',
+            500 );
     }
 
     # 2.1 - case OK (nickname not used)
     if ($res) {
-          return $self->_registerUser($req);
+        return $self->_registerUser($req);
     }
 
     # 2.2 - case NOK, display form
     else {
-          if ( $req->wantJSON ) {
-              return $self->p->sendJSONresponse(
-                  $req,
-                  {
-                      result => 0,
-                      error  => 'Nickname already exists, choose another one'
-                  }
-              );
-          }
-          else {
-              return $self->form( $req,
-                  'Nickname exists already, choose another one' );
-        }
+        return $self->form( $req,
+            'Nickname already exists, choose another one' );
     }
 }
 
 # Populate and display form
+#
+# Response: PSGI format
 sub form {
-      my ( $self, $req, $error ) = @_;
-      return $self->p->sendHtml(
-          $req,
-          'debianRegistration',
-          params => {
-              USER  => $req->user,
-              TOKEN => $self->ott->createToken(
-                  { user => $req->user, data => $req->sessionInfo }
-              ),
-              ERROR => $error,
-          }
-      );
+    my ( $self, $req, $error ) = @_;
+    if ( $req->wantJSON ) {
+        return $self->p->sendJSONresponse( $req,
+            { result => ( $error ? 0 : 1 ), error => $error } );
+    }
+    else {
+        return $self->p->sendHtml(
+            $req,
+            'debianRegistration',
+            params => {
+                USER  => $req->user,
+                TOKEN => $self->ott->createToken(
+                    { user => $req->user, data => $req->sessionInfo }
+                ),
+                ERROR => $error,
+            }
+        );
+    }
 }
 
+# Boolean function that checks if proposed nickname is already used
 sub _checknickname {
-      my ( $self, $nickname ) = @_;
+    my ( $self, $nickname ) = @_;
 
-      # 1 - LDAP
-      $self->validateLdap;
+    # 1 - LDAP
+    $self->validateLdap;
 
-      unless ( $self->ldap ) {
-          $self->logger->error('LDAP seems down');
-          die;
-      }
+    unless ( $self->ldap ) {
+        $self->logger->error('LDAP seems down');
+        die;
+    }
 
-      $self->bind();
+    $self->bind();
 
-      my $mesg = $self->ldap->search(
-          base   => $self->conf->{ldapBase},
-          scope  => 'sub',
-          filter => $self->filter->( { user => $nickname } ),
-          defer  => $self->conf->{ldapSearchDeref} || 'find',
-          attrs  => $self->attrs,
-      );
-      if ( $mesg->code() != 0 ) {
-          $self->logger->error( 'LDAP returns an error: ' . $mesg->error );
-          die;
-      }
+    my $mesg = $self->ldap->search(
+        base   => $self->conf->{ldapBase},
+        scope  => 'sub',
+        filter => $self->filter->( { user => $nickname } ),
+        defer  => $self->conf->{ldapSearchDeref} || 'find',
+        attrs  => $self->attrs,
+    );
+    if ( $mesg->code() != 0 ) {
+        $self->logger->error( 'LDAP returned an error: ' . $mesg->error );
+        die;
+    }
 
-      # Fail if a DD exists with this nickname
-      return 0 if $mesg->entry(0);
+    # Fail if a DD exists with this nickname
+    return 0 if $mesg->entry(0);
+
+    # 2 - SQL DB
+    my $sth;
+    eval {
+        $sth = $self->dbh->prepare(
+            'SELECT username from ' . $self->table . ' WHERE username=?' );
+        $sth->execute($nickname);
+    };
+    if ($@) {
+        $self->logger->error("SQL DB returned an error: $@");
+        die;
+    }
+    return 0 if $sth->fetchrow_hashref();
+
+    # Well, nickname not found anywhere, let's agree this nickname
+    return 1;
 }
 
+sub _checkOtherFields {
+    my($self,$req) = @_;
+    # TODO: insert here fields checks
+    return '';
+}
+
+# Registration method
+#
+# Response: PSGI format
 sub _registerUser {
-      my ( $self, $req ) = @_;
-      eval {
-          $self->dbh->prepare( 'INSERT INTO '
-                . $self->table
-                . ' VALUES ('
-                . join( ',', map { '?' } @fields )
-                . ')' );
-          $self->dbh->execute( map { $req->param($_) } @fields );
-      };
-      if ($@) {
+    my ( $self, $req ) = @_;
+    my $sth;
+    eval {
+        $sth = $self->dbh->prepare( 'INSERT INTO '
+              . $self->table . '('
+              . join( ',', @fields ) . ')'
+              . ' VALUES ('
+              . join( ',', map { '?' } @fields )
+              . ')' );
+        $sth->execute( map { $req->param($_) } @fields );
+    };
+    if ($@) {
 
-          # If connection isn't available, error is displayed by dbh()
-          $self->logger->error("DBI error: $@") if ( $self->_dbh );
-          return $self->p->sendError( $req, 'Error form database, try later' );
-      }
+        # If connection isn't available, error is displayed by dbh()
+        $self->logger->error("DBI error: $@") if ( $self->_dbh );
+        return $self->p->sendError( $req, 'Error form database, try later' );
+    }
 
-      # Finish auth process
-      $req->info('Successfully registered');
-      return $self->p->do(
-          $req,
-          @{ $self->p->betweenAuthAndData },
-          $self->p->sessionData,
-          @{ $self->p->afterData },
-          $self->p->validSession,
-          @{ $self->p->endAuth },
-          sub { PE_INFO },
-      );
+    # Finish auth process and display registration message
+
+    # Prepare message (HTML acccepted here)
+    $req->info('Successfully registered');
+
+    # Launch remaining LLNG methods (`do()` from
+    # Lemonldap::NG::Portal::Main::Run will do the job. Just to declare
+    # methods to launch (keeping authentication from remote system)
+    return $self->p->do(
+        $req,
+
+        # Plugins entryPoints
+        @{ $self->p->betweenAuthAndData },
+
+        # Methods that populates session data
+        $self->p->sessionData,
+
+        # Plugins entryPoints
+        @{ $self->p->afterData },
+
+        # Methods that validate session
+        $self->p->validSession,
+
+        # Plugins entryPoints
+        @{ $self->p->endAuth },
+
+        # Fake entrypoint to force displaying registration message
+        sub { PE_INFO },
+    );
 }
 
 1;
