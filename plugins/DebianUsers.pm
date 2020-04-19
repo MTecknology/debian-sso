@@ -1,3 +1,6 @@
+# Plugin to register authenticated users (GitHub, LinkedIn,...) but not known
+# by our SQL database
+
 package Lemonldap::NG::Portal::Plugins::DebianUsers;
 
 use strict;
@@ -10,6 +13,7 @@ extends 'Lemonldap::NG::Portal::Main::Plugin',
 
 use Lemonldap::NG::Portal::Main::Constants qw(
   PE_OK
+  PE_INFO
 );
 
 # Parameters
@@ -21,6 +25,17 @@ has debianRegisterTimeout => (
         $_[0]->conf->{debianRegisterTimeout} || 600;
     },
 );
+
+# SQL fields
+# * uid: nickname
+# * displayname: display name
+# * sshkey: SSK key
+# * gpgkey: GPG key
+our @fields = (qw(uid displayname sshkey gpgkey));
+
+# Sessions parameter: this plugin uses macros that returns wanted data:
+#  * mail: should be
+#    `($uid ? "$uid\@debian.org" : $linkedIn_emailAddress ? $linkedIn_emailAddress : $github_emailAddress )`
 
 # LLNG Entry point to catch authentication requests before "search" step
 use constant aroundSub => { getUser => 'check' };
@@ -66,16 +81,7 @@ sub check {
     $self->p->setMacros($req);
 
     # Display registration form
-    return $self->p->sendHtml(
-        $req,
-        'debianRegistration',
-        params => {
-            USER  => $req->user,
-            TOKEN => $self->ott->createToken(
-                { user => $req->user, data => $req->sessionInfo }
-            ),
-        }
-    );
+    return $self->form($req);
 }
 
 # This method receives POST requests from registration form
@@ -84,8 +90,125 @@ sub register {
 
     # Objects inherited from LLNG libs (configured via manager:
     # "General Parameters" => "authentication modules"):
-    #  * $self->dbh : SQL  connection (non DD users, registered using this plugin)
+    #  * $self->dbh : SQL  connection (non DD users, registered using this
+    #                 plugin)
     #  * $self->ldap: LDAP connection (DD users)
+
+    # 0 - get data
+    my $nickname = $req->param('nick');
+    my $token    = $req->param('token');
+
+    # 1 - check token
+    my $session = $self->ott->getToken($token);
+    unless ($session) {
+        return $self->sendError( $req,
+            'Bad token or token expired, restart registration process', 400 );
+    }
+    $req->user( $session->{user} );
+    $req->sessionInfo( $session->{data} );
+
+    # 2 - verify that nickname does not already exist in LDAP or SQL DB
+    my $res = eval { $self->_checknickname($nickname) };
+    if ($@) {
+          return $self->p->sendError( $req, 'LDAP server seems down', 500 );
+    }
+
+    # 2.1 - case OK (nickname not used)
+    if ($res) {
+          return $self->_registerUser($req);
+    }
+
+    # 2.2 - case NOK, display form
+    else {
+          if ( $req->wantJSON ) {
+              return $self->p->sendJSONresponse(
+                  $req,
+                  {
+                      result => 0,
+                      error  => 'Nickname exists already, choose another one'
+                  }
+              );
+          }
+          else {
+              return $self->form( $req,
+                  'Nickname exists already, choose another one' );
+        }
+    }
+}
+
+# Populate and display form
+sub form {
+      my ( $self, $req, $error ) = @_;
+      return $self->p->sendHtml(
+          $req,
+          'debianRegistration',
+          params => {
+              USER  => $req->user,
+              TOKEN => $self->ott->createToken(
+                  { user => $req->user, data => $req->sessionInfo }
+              ),
+              ERROR => $error,
+          }
+      );
+}
+
+sub _checknickname {
+      my ( $self, $nickname ) = @_;
+
+      # 1 - LDAP
+      $self->validateLdap;
+
+      unless ( $self->ldap ) {
+          $self->logger->error('LDAP seems down');
+          die;
+      }
+
+      $self->bind();
+
+      my $mesg = $self->ldap->search(
+          base   => $self->conf->{ldapBase},
+          scope  => 'sub',
+          filter => $self->filter->( { user => $nickname } ),
+          defer  => $self->conf->{ldapSearchDeref} || 'find',
+          attrs  => $self->attrs,
+      );
+      if ( $mesg->code() != 0 ) {
+          $self->logger->error( 'LDAP returns an error: ' . $mesg->error );
+          die;
+      }
+
+      # Fail if a DD exists with this nickname
+      return 0 if $mesg->entry(0);
+}
+
+sub _registerUser {
+      my ( $self, $req ) = @_;
+      eval {
+          $self->dbh->prepare( 'INSERT INTO '
+                . $self->table
+                . ' VALUES ('
+                . join( ',', map { '?' } @fields )
+                . ')' );
+          $self->dbh->execute( map { $req->param($_) } @fields );
+      };
+      if ($@) {
+
+          # If connection isn't available, error is displayed by dbh()
+          $self->logger->error("DBI error: $@") if ( $self->_dbh );
+          return $self->p->sendError( $req, 'Error form database, try later' );
+      }
+
+      # Finish auth process
+      $req->info('Successfully registered');
+      return $self->p->do(
+          $req,
+          @{ $self->p->betweenAuthAndData },
+          $self->p->sessionData,
+          @{ $self->p->afterData },
+          $self->p->validSession,
+          @{ $self->p->endAuth },
+          sub { PE_INFO },
+      );
 }
 
 1;
