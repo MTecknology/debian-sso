@@ -1,10 +1,14 @@
-# Plugin to register authenticated users (GitHub, LinkedIn,...) but not known
-# by our SQL database
+# Lemonldap::NG plugin to register authenticated users (GitHub, LinkedIn,...)
+# but not known in our SQL database
+#
+# It handles 2 endpoints:
+#  * LLNG internal getUser() method is replaced by check() which displays
+#    form if needed
+#  * https://portal/debianregister : receive registration data from form
 
 package Lemonldap::NG::Portal::Plugins::DebianUsers;
 
 use strict;
-
 use Moo;
 
 # Inheritance:
@@ -85,11 +89,16 @@ use constant aroundSub => { getUser => 'check' };
 
 # Declare /debianregister route (used by registration form).
 # Only POST requests are accepted here
+#
+# No need to launch  ::Lib::DBI and ::Lib::LDAP init() methods here: already
+# launched by authentication modules
 sub init {
     my ($self) = @_;
     $self->addUnauthRoute( debianregister => 'register', ['POST'] );
     return 1;
 }
+
+# RUNNING METHODS
 
 # Checks if non-DD user is known from SQL database. Displays registration
 # form else
