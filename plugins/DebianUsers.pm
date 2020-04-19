@@ -64,9 +64,6 @@ our @requiredFields = (qw(uid mail username displayname firstname));
 #  * mail: should be
 #    `($linkedIn_emailAddress ? $linkedIn_emailAddress : $github_emailAddress ? $github_emailAddress : "$uid\@debian.org" )`
 
-# LLNG Entry point to catch authentication requests before "search" step
-use constant aroundSub => { getUser => 'check' };
-
 # Internal getters
 #
 # One-time-token instance
@@ -80,16 +77,26 @@ has ott => (
     }
 );
 
-# Declare /debianregister route
+# INTERFACE WITH LLNG
+#
+# LLNG Entry point to catch authentication requests before "search" step:
+# launches check() instead of LLNG internal getUser() method
+use constant aroundSub => { getUser => 'check' };
+
+# Declare /debianregister route (used by registration form).
+# Only POST requests are accepted here
 sub init {
     my ($self) = @_;
     $self->addUnauthRoute( debianregister => 'register', ['POST'] );
     return 1;
 }
 
+# Checks if non-DD user is known from SQL database. Displays registration
+# form else
+#
 # This method is launched during auth process, it must returns LLNG constants
 #
-# Response Lemonldap::NG::Portal::Main::Constants constant
+# Response: Lemonldap::NG::Portal::Main::Constants constant
 sub check {
     my ( $self, $sub, $req ) = @_;
 
@@ -116,10 +123,12 @@ sub check {
     return PE_SENDRESPONSE;
 }
 
+# Register user
+#
 # This method receives POST requests from registration form (POST requests only
 # as declared in init() method)
 #
-# Response in PSGI format
+# Response: PSGI format
 sub register {
     my ( $self, $req ) = @_;
 
@@ -172,7 +181,7 @@ sub register {
     }
 }
 
-# Populate and display form
+# Internal method to populate and display form
 #
 # Response: PSGI format
 sub form {
@@ -196,7 +205,7 @@ sub form {
     }
 }
 
-# Boolean function that checks if proposed nickname is already used
+# Internal boolean function that checks if proposed nickname is already used
 sub _checknickname {
     my ( $self, $nickname ) = @_;
 
@@ -242,6 +251,8 @@ sub _checknickname {
     return 1;
 }
 
+# Internal function that checks if fields are well filed.
+# Return an error to display if needed
 sub _checkOtherFields {
     my ( $self, $req ) = @_;
 
@@ -260,7 +271,7 @@ sub _checkOtherFields {
     return '';
 }
 
-# Registration method
+# Real registration method: insert fields in SQL DB
 #
 # Response: PSGI format
 sub _registerUser {
