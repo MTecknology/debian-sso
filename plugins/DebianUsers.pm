@@ -41,6 +41,8 @@ has debianRegisterTimeout => (
 our @fields =
   (qw(uid mail username displayname firstname lastname gpgkey sshkey));
 
+our @requiredFields = (qw(uid mail username displayname firstname));
+
 # Sessions parameter: this plugin uses macros that returns wanted data:
 #  * mail: should be
 #    `($linkedIn_emailAddress ? $linkedIn_emailAddress : $github_emailAddress ? $github_emailAddress : "$uid\@debian.org" )`
@@ -226,7 +228,18 @@ sub _checknickname {
 sub _checkOtherFields {
     my ( $self, $req ) = @_;
 
+    # Check if required fields are set
+    my @missings;
+    foreach (@requiredFields) {
+        push @missings, $_ unless $req->param($_);
+    }
+    if (@missings) {
+        return 'These fields are required: ' . join( ', ', @missings );
+    }
+
     # TODO: insert here fields checks
+
+    # No error:
     return '';
 }
 
@@ -236,15 +249,18 @@ sub _checkOtherFields {
 sub _registerUser {
     my ( $self, $req ) = @_;
     my $sth;
+
+    # Filter fields: only those who are filed are taken in this query
+    my @_fields = map { $req->param($_) ? ($_) : () } @fields;
     eval {
         $sth =
           $self->dbh->prepare( 'INSERT INTO '
               . $self->table . ' ('
-              . join( ',', @fields )
+              . join( ',', @_fields )
               . ') VALUES ('
-              . join( ',', '?' x @fields )
+              . join( ',', map { '?' } @_fields )
               . ')' );
-        $sth->execute( map { $req->param($_) } @fields );
+        $sth->execute( map { $req->param($_) } @_fields );
     };
     if ($@) {
 
