@@ -1,12 +1,14 @@
 # Debian SSO Certificates plugin for Lemonldap::NG
 
-## To enable it:
+## Debian certificates plugin
+
+### To enable it:
 
  * add `customPlugins = Lemonldap::NG::Portal::Plugins::DebianSSOCerts` in
    /etc/lemonldap-ng.ini, section [portal]
  * add a menu entry that points to `https://<portal>/certs`
 
-## Openssl installation
+### Openssl installation
 
  * Set up a Openssl CA and create a openssl.sh that looks like:
 ```shell
@@ -18,7 +20,7 @@ openssl "$@"
  * CA private key should be named `/openssl/working/directory/ca.key`
  * Change permission to allow this directory to __www-data__ user only.
 
-## Configuration:
+### Configuration:
  * to avoid mail filtering, change default "From" parameter in LLNG SMTP
    configuration
  * Override default parameters in `lemonldap-ng.ini` file, section `[portal]`.
@@ -39,3 +41,7 @@ openssl "$@"
 TODO:
  * improve CSS
  * improve all openssl commands (plugins directory)
+
+## Debian registration plugin for non-DD)
+
+TODO: finish it
