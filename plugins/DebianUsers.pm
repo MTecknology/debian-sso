@@ -7,23 +7,40 @@ use strict;
 
 use Moo;
 
+# Inheritance:
+#  * LLNG plugin
+#  * SQL object (uses DBI parameters declared in authentication scheme) - non-DD database
+#    Provides $self->dbh, a DBI object
+#  * LDAP object (uses LDAP parameters declared in authentication scheme) - DD database
+#    Provides $self->ldap, a Net::LDAP object
 extends 'Lemonldap::NG::Portal::Main::Plugin',
   'Lemonldap::NG::Portal::Lib::DBI',
   'Lemonldap::NG::Portal::Lib::LDAP';
 
+# LLNG constants used in `check()` responses
 use Lemonldap::NG::Portal::Main::Constants qw(
   PE_OK
   PE_INFO
   PE_SENDRESPONSE
 );
 
-# Parameters
+# Parameters from lemonldap-ng.ini with their default values
 #
 # Timeout to register, default 10 mn
 has debianRegisterTimeout => (
     is      => 'ro',
     default => sub {
         $_[0]->conf->{debianRegisterTimeout} || 600;
+    },
+);
+
+# Nickname regexp, default 3 to 20 alphanum-or-"-" chars. Starts with a
+# alphanum char
+has debianNicknameRegexp => (
+    is      => 'ro',
+    default => sub {
+        my $re = $_[0]->conf->{debianNicknameRegexp} || '^\w[\w\-]{2,19}$';
+        return qr/$re/;
     },
 );
 
@@ -54,7 +71,7 @@ use constant aroundSub => { getUser => 'check' };
 #
 # One-time-token instance
 has ott => (
-    is      => 'rw',
+    is      => 'ro',
     lazy    => 1,
     default => sub {
         my $ott = $_[0]->{p}->loadModule('::Lib::OneTimeToken');
@@ -126,7 +143,7 @@ sub register {
     $req->sessionInfo( $session->{data} );
 
     # Check username string
-    if ( $nickname !~ $self->nickRegexp ) {
+    if ( $nickname !~ $self->debianNicknameRegexp ) {
         return $self->form( $req, 'Nickname not allowed' );
     }
 
