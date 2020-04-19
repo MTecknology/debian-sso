@@ -1,4 +1,4 @@
-# Debian SSO Certificates plugin for Lemonldap::NG
+# Debian SSO plugins for Lemonldap::NG
 
 ## Debian certificates plugin
 
