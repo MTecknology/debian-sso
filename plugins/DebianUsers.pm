@@ -96,6 +96,13 @@ use constant aroundSub => { getUser => 'check' };
 sub init {
     my ($self) = @_;
     $self->addUnauthRoute( debianregister => 'register', ['POST'] );
+    # Tests
+    my $res = $self->Lemonldap::NG::Portal::Lib::DBI::init();
+    return $res if($res);
+    unless($self->table) {
+        $self->error('Set SQL table in configuration');
+        return 0;
+    }
     return 1;
 }
 
