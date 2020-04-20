@@ -24,6 +24,7 @@ Depends:
 # libglib-perl,
 # liblasso-perl,
  liblwp-protocol-https-perl,
- libnet-ldap-perl
+ libnet-ldap-perl,
+ libdbd-pg-perl,
 Description: Debian SSO template
  TODO
