@@ -30,14 +30,12 @@
       </div>
       <div class="form-group">
         <label for="gpgkey">gpgkey</label>
-        <textarea class="form-control" name="gpgkey" id="gpgkey" aria-describedby=" gpgkeyHelp">
-	</textarea>
+        <textarea class="form-control" name="gpgkey" id="gpgkey" aria-describedby=" gpgkeyHelp"></textarea>
         <small id=" gpgkeyHelp" class="form-text text-muted">Choose your Debian nickname.</small>
       </div>
       <div class="form-group">
         <label for="sshkey">sshkey</label>
-        <textarea class="form-control" name="sshkey" id="sshkey" aria-describedby=" sshkeyHelp">
-	</textarea>
+        <textarea class="form-control" name="sshkey" id="sshkey" aria-describedby=" sshkeyHelp"></textarea>
         <small id=" sshkeyHelp" class="form-text text-muted">Choose your Debian nickname.</small>
       </div>
       <button id="submit" type="submit" class="btn btn-primary">Register me</button>
