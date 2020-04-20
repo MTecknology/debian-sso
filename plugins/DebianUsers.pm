@@ -62,7 +62,8 @@ has debianNicknameRegexp => (
 our @fields =
   (qw(uid mail username displayname firstname lastname gpgkey sshkey));
 
-our @requiredFields = (qw(uid mail username displayname firstname));
+# NB: uid and mail are required but provided by authentication mechanism
+our @requiredFields = (qw(username displayname firstname));
 
 # Sessions parameter: this plugin uses macros that returns wanted data:
 #  * mail: should be
@@ -118,7 +119,7 @@ sub check {
     # USER NOT FOUND IN USERS DATABASE
 
     # Don't intercept DD requests
-    return $res if $self->getModule( $req, "auth" ) eq 'LDAP';
+    return $res if $self->p->getModule( $req, "auth" ) eq 'LDAP';
 
     # Get linkedIn/GitHub data
     $self->p->setAuthSessionInfo($req);
@@ -148,7 +149,7 @@ sub register {
     #  * $self->ldap: LDAP connection (DD users)
 
     # 0 - get data
-    my $nickname = $req->param('nick');
+    my $nickname = $req->param('username');
     my $token    = $req->param('token');
 
     # 1 - check token
@@ -195,9 +196,12 @@ sub register {
 # Response: PSGI format
 sub form {
     my ( $self, $req, $error ) = @_;
+    my $token = $self->ott->createToken(
+        { user => $req->user, data => $req->sessionInfo } );
     if ( $req->wantJSON ) {
         return $self->p->sendJSONresponse( $req,
-            { result => ( $error ? 0 : 1 ), error => $error } );
+            { result => ( $error ? 0 : 1 ), error => $error, token => $token, }
+        );
     }
     else {
         return $self->p->sendHtml(
@@ -205,9 +209,7 @@ sub form {
             'debianRegistration',
             params => {
                 USER  => $req->user,
-                TOKEN => $self->ott->createToken(
-                    { user => $req->user, data => $req->sessionInfo }
-                ),
+                TOKEN => $token,
                 ERROR => $error,
             }
         );
@@ -287,23 +289,28 @@ sub _registerUser {
     my ( $self, $req ) = @_;
     my $sth;
 
+    # TODO: fix that
+    my %values = ( map { ( $_ => $req->param($_) ) } @fields );
+    $values{uid}  = $req->sessionInfo->{linkedIn_id};
+    $values{mail} = $req->sessionInfo->{linkedIn_emailAddress};
+
     # Filter fields: only those who are filed are taken in this query
-    my @_fields = map { $req->param($_) ? ($_) : () } @fields;
+    my @_fields = map { $values{$_} ? ($_) : () } @fields;
     eval {
         $sth =
           $self->dbh->prepare( 'INSERT INTO '
               . $self->table . ' ('
               . join( ',', @_fields )
-              . ') VALUES ('
-              . join( ',', map { '?' } @_fields )
-              . ')' );
-        $sth->execute( map { $req->param($_) } @_fields );
+              . ") VALUES ("
+              . join( ",", map { '?' } @_fields )
+              . ")" );
+        $sth->execute( map { $values{$_} } @_fields );
     };
     if ($@) {
 
         # If connection isn't available, error is displayed by dbh()
         $self->logger->error("DBI error: $@") if ( $self->_dbh );
-        return $self->p->sendError( $req, 'Error form database, try later' );
+        return $self->form( $req, 'Error form database, try later' );
     }
 
     # Finish auth process and display registration message
@@ -311,29 +318,35 @@ sub _registerUser {
     # Prepare message (HTML acccepted here)
     $req->info('Successfully registered');
 
+    # Restart Choices initialization
+    $self->p->extractFormInfo($req);
+    $self->p->getUser($req) || $self->logger->error("User registered but not found, verify your configuration");;
+
     # Launch remaining LLNG methods (`do()` from
     # Lemonldap::NG::Portal::Main::Run will do the job. Just to declare
     # methods to launch (keeping authentication from remote system)
     return $self->p->do(
         $req,
+        [
 
-        # Plugins entryPoints
-        @{ $self->p->betweenAuthAndData },
+            # Plugins entryPoints
+            @{ $self->p->betweenAuthAndData },
 
-        # Methods that populates session data
-        $self->p->sessionData,
+            # Methods that populates session data
+            $self->p->sessionData,
 
-        # Plugins entryPoints
-        @{ $self->p->afterData },
+            # Plugins entryPoints
+            @{ $self->p->afterData },
 
-        # Methods that validate session
-        $self->p->validSession,
+            # Methods that validate session
+            $self->p->validSession,
 
-        # Plugins entryPoints
-        @{ $self->p->endAuth },
+            # Plugins entryPoints
+            @{ $self->p->endAuth },
 
-        # Fake entrypoint to force displaying registration message
-        sub { PE_INFO },
+            # Fake entrypoint to force displaying registration message
+            sub { PE_INFO },
+        ]
     );
 }
 
