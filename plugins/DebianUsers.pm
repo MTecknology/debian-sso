@@ -110,6 +110,15 @@ sub init {
 sub check {
     my ( $self, $sub, $req ) = @_;
 
+    # Don't intercept DD requests
+    return $sub->($req) if $self->p->getModule( $req, "auth" ) eq 'LDAP';
+
+    # Get linkedIn/GitHub data
+    $self->p->setAuthSessionInfo($req);
+
+    # Map social network id to user field
+    $req->user($req->sessionInfo->{linkedIn_id} || $req->sessionInfo->{github_id});
+
     # Launch getUser and intercept result
     my $res = $sub->($req);
 
@@ -117,12 +126,6 @@ sub check {
     return PE_OK if $res == PE_OK;
 
     # USER NOT FOUND IN USERS DATABASE
-
-    # Don't intercept DD requests
-    return $res if $self->p->getModule( $req, "auth" ) eq 'LDAP';
-
-    # Get linkedIn/GitHub data
-    $self->p->setAuthSessionInfo($req);
 
     # Calculate macros
     $self->p->setMacros($req);
